@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Switch } from "./ui/switch";
+import { apiUrl } from "../lib/url";
 
 interface Props {
   folderPath: string;
@@ -31,7 +32,7 @@ export function FolderPermsDialog({ folderPath, onClose }: Props) {
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/folder-mcp-perms");
+        const r = await fetch(apiUrl("/api/folder-mcp-perms"));
         const map = (await r.json()) as Record<string, Perm>;
         if (cancelled) return;
         const cur = map[folderPath];
@@ -55,7 +56,7 @@ export function FolderPermsDialog({ folderPath, onClose }: Props) {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await fetch("/api/folder-mcp-perms", {
+      const r = await fetch(apiUrl("/api/folder-mcp-perms"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ path: folderPath, ...perm }),
@@ -78,7 +79,7 @@ export function FolderPermsDialog({ folderPath, onClose }: Props) {
         .split("/")
         .map((s) => encodeURIComponent(s))
         .join("/");
-      const r = await fetch(`/api/folder-mcp-perms/${enc}`, { method: "DELETE" });
+      const r = await fetch(apiUrl(`/api/folder-mcp-perms/${enc}`), { method: "DELETE" });
       if (!r.ok) throw new Error(`${r.status}`);
       setMsg("Override removed. Folder now inherits.");
       setHasOverride(false);

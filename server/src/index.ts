@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { loadConfig } from "./config";
+import { stripBasePath } from "./base-path";
 import { parseArgs, getUsage, CliError } from "./cli";
 import { mkdir } from "node:fs/promises";
 import { VERSION } from "./version";
@@ -25,7 +26,15 @@ async function main() {
   }
 
   // V44: resolve config with cli > env > XDG default precedence
-  const config = loadConfig(action.options);
+  let config;
+  try {
+    config = loadConfig(action.options);
+  } catch (e) {
+    // e.g. an invalid FOLIO_BASE_PATH
+    const msg = e instanceof CliError ? e.message : String(e);
+    process.stderr.write(`folio: ${msg}\n`);
+    process.exit(2);
+  }
 
   // mkdir -p so first run on a fresh XDG default doesn't crash
   await mkdir(config.vaultDir, { recursive: true });
@@ -48,6 +57,7 @@ async function main() {
     gitDebounceMs: config.gitDebounceMs,
     mcpDisabled: action.options.mcpDisabled,
     viewOnly: action.options.viewOnly,
+    basePath: config.basePath,
   });
   const viewOnly = action.options.viewOnly ?? false;
 
@@ -89,11 +99,24 @@ async function main() {
   // Mount the embedded / on-disk / downloaded web client last so it
   // acts as the SPA catch-all for everything not handled by /api or /mcp.
   const { mountEmbeddedWeb } = await import("./web/serve");
-  await mountEmbeddedWeb(app);
+  await mountEmbeddedWeb(app, { basePath: config.basePath });
 
-  app.listen(config.port);
+  if (config.basePath === "") {
+    app.listen(config.port);
+  } else {
+    // Elysia's listen() routes the raw request, so strip the prefix in
+    // front of it. Options mirror what listen() passes to Bun.serve.
+    const basePath = config.basePath;
+    Bun.serve({
+      port: config.port,
+      development: process.env.NODE_ENV !== "production",
+      reusePort: true,
+      idleTimeout: 30,
+      fetch: (req) => app.fetch(stripBasePath(req, basePath)),
+    });
+  }
   console.log(
-    `folio server :${config.port} → vault ${config.vaultDir}${viewOnly ? " (view-only)" : ""}`,
+    `folio server :${config.port}${config.basePath ? ` (base path ${config.basePath})` : ""} → vault ${config.vaultDir}${viewOnly ? " (view-only)" : ""}`,
   );
 }
 

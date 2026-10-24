@@ -653,6 +653,7 @@ folio --vault-dir <path>   # -v <path>
 folio --port <n>           # -p <n>
 folio --mcp-disabled       # skip mounting MCP at /mcp/*
 folio --view-only          # preview UI, no edits via API or MCP
+folio --base-path /vault    # served under /vault by a prefix-stripping proxy
 ```
 
 `--view-only` serves the vault for viewing only. The web UI shows the
@@ -666,6 +667,36 @@ This restricts what can be changed *through folio*, not the
 filesystem: the server still keeps its own state in `.brain/` (login
 sessions, the search cache, RAG vectors, API-key last-used times), so
 the vault must stay writable.
+
+### Serving under a sub-path
+
+`--base-path <prefix>` (or `FOLIO_BASE_PATH`) serves folio under a URL
+prefix, for example on a shared Kubernetes host that gives each service
+`/<service-name>` instead of its own hostname. folio answers on
+`/vault/…` and also on the bare paths, so it works both when you open it
+directly (`http://localhost:3000/vault/`) and behind a reverse proxy
+that strips the prefix before forwarding. The web UI gets a
+`<base href="/vault/">`, and the OAuth discovery documents advertise
+URLs under `/vault`.
+
+```nginx
+location ~ ^/vault(/|$)(.*) {
+  rewrite ^/vault(/|$)(.*) /$2 break;
+  proxy_pass http://127.0.0.1:3000;
+  # Needed for OAuth: folio builds its advertised URLs from these.
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+```sh
+FOLIO_BASE_PATH=/vault folio --view-only
+```
+
+The UI then loads at `https://host/vault/`, and MCP clients connect to
+`https://host/vault/mcp`. The prefix must start with `/`, have no
+trailing `/`, and use only `A-Z a-z 0-9 . _ ~ -`. Without it, nothing
+changes.
 
 Precedence: **CLI flag > env var > XDG default**. Unknown flag →
 stderr error + exit 2.

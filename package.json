@@ -42,6 +42,7 @@
     "dev:web": "bun --cwd=web run dev",
     "build": "bun --cwd=web run build",
     "start": "bun --cwd=server run start",
+    "install:local": "bun scripts/install-local.ts",
     "test": "bun --cwd=server test",
     "typecheck": "bun --cwd=server run typecheck && bun --cwd=web run typecheck"
   },

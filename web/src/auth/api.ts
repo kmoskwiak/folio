@@ -1,6 +1,8 @@
 // Thin client for /api/auth/*. Used by the login Dialog and the
 // Security tab in Settings.
 
+import { apiUrl } from "../lib/url";
+
 export interface AuthStatus {
   configured: boolean;
   authenticated: boolean;
@@ -16,11 +18,11 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export const authApi = {
   async status(): Promise<AuthStatus> {
-    return jsonOrThrow(await fetch("/api/auth/status"));
+    return jsonOrThrow(await fetch(apiUrl("/api/auth/status")));
   },
   async login(password: string): Promise<{ token: string; expiresAt: number }> {
     return jsonOrThrow(
-      await fetch("/api/auth/login", {
+      await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ password }),
@@ -28,7 +30,7 @@ export const authApi = {
     );
   },
   async logout(token: string): Promise<void> {
-    await fetch("/api/auth/logout", {
+    await fetch(apiUrl("/api/auth/logout"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token }),
@@ -36,7 +38,7 @@ export const authApi = {
   },
   async setPassword(newPassword: string, currentPassword?: string): Promise<void> {
     await jsonOrThrow(
-      await fetch("/api/auth/set", {
+      await fetch(apiUrl("/api/auth/set"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ newPassword, currentPassword }),
@@ -45,7 +47,7 @@ export const authApi = {
   },
   async clearPassword(currentPassword: string): Promise<void> {
     await jsonOrThrow(
-      await fetch("/api/auth/clear", {
+      await fetch(apiUrl("/api/auth/clear"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ currentPassword }),

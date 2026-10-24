@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiUrl } from "../lib/url";
 
 interface TrashItem {
   path: string;
@@ -17,7 +18,7 @@ export function TrashView({ onClose, onRestored }: Props) {
 
   const reload = useCallback(async () => {
     try {
-      const res = await fetch("/api/trash");
+      const res = await fetch(apiUrl("/api/trash"));
       if (!res.ok) throw new Error(`${res.status}`);
       setItems((await res.json()) as TrashItem[]);
     } catch (e) {
@@ -31,7 +32,7 @@ export function TrashView({ onClose, onRestored }: Props) {
 
   const restore = async (p: string) => {
     try {
-      const res = await fetch("/api/trash/restore", {
+      const res = await fetch(apiUrl("/api/trash/restore"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ trashPath: p }),

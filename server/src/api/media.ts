@@ -27,7 +27,8 @@ function mimeFor(name: string): string {
   return MIME[ext] ?? "application/octet-stream";
 }
 
-export function mediaRoutes(vault: Vault) {
+// `basePath` ("/vault" or "") prefixes the URL returned for an upload.
+export function mediaRoutes(vault: Vault, basePath = "") {
   return new Elysia()
     .post(
       "/api/media/*",
@@ -41,7 +42,7 @@ export function mediaRoutes(vault: Vault) {
           }
           const bytes = new Uint8Array(await file.arrayBuffer());
           const rel = await vault.writeMedia(noteRel, file.name, bytes);
-          return { url: `/api/media-raw/${rel}`, path: rel, name: file.name };
+          return { url: `${basePath}/api/media-raw/${rel}`, path: rel, name: file.name };
         } catch (e) {
           const { status, body: err } = asError(e);
           set.status = status;

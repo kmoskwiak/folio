@@ -158,11 +158,36 @@ function getResolver(): Promise<Resolver> {
   return resolverPromise;
 }
 
+// Tests only: forget the cached resolver so the next mount re-resolves
+// (e.g. after pointing FOLIO_WEB_DIR at a fixture).
+export function resetWebResolverForTests(): void {
+  resolverPromise = undefined;
+}
+
+// The web client uses only base-relative URLs, so serving it under a
+// reverse-proxy prefix needs nothing more than a <base href> pointing there.
+// Injected even without a prefix (<base href="/">): otherwise a SPA-fallback
+// hit on a nested path like /foo/bar would resolve ./assets/… and api/…
+// against /foo/. `basePath` is validated by normalizeBasePath (strict
+// charset), so it is safe to interpolate.
+export function injectBaseHref(html: string, basePath: string): string {
+  return html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}<base href="${basePath}/" />`);
+}
+
+export interface MountWebOptions {
+  // Public URL prefix ("/vault") or "" when served at the root.
+  basePath?: string;
+}
+
 // Mount as a low-priority catch-all. Must be called AFTER all /api/* and
 // /mcp/* routes. Mutates `app` in place — `app` is typed as `unknown`
 // because Elysia's deeply-parametrised type leaks into every chained
 // route otherwise.
-export async function mountEmbeddedWeb(app: unknown): Promise<void> {
+export async function mountEmbeddedWeb(
+  app: unknown,
+  opts: MountWebOptions = {},
+): Promise<void> {
+  const basePath = opts.basePath ?? "";
   // Warm the resolver so the first request doesn't pay the download cost.
   const r = await getResolver();
   if (r.kind === "none") return;
@@ -181,6 +206,15 @@ export async function mountEmbeddedWeb(app: unknown): Promise<void> {
           p === "index.html"
             ? "no-cache"
             : "public, max-age=31536000, immutable";
+        if (p === "index.html") {
+          // Re-read and injected per request on purpose: with an on-disk
+          // web/dist, a frontend rebuild renames the hashed assets, and a
+          // cached index would keep pointing at the deleted ones.
+          const html = injectBaseHref(new TextDecoder().decode(data), basePath);
+          // Bytes, not a string: a string body would default the
+          // content-type to text/plain.
+          return new Response(new TextEncoder().encode(html));
+        }
         return new Response(data as BodyInit);
       }
     }

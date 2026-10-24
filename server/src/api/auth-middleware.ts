@@ -3,6 +3,7 @@ import type { AuthStore } from "../auth/store";
 import type { TokenStore } from "../auth/tokens";
 import type { OAuthStore } from "../auth/oauth-store";
 import type { APIKeyStore } from "../auth/api-keys";
+import { publicBase } from "./oauth-discovery";
 
 // V53: protect every /api/* (except /api/auth/{status,login}) + /mcp/*
 // (including /mcp itself, not just /mcp/sub-paths) once auth.json exists.
@@ -34,44 +35,14 @@ function bearer(req: Request): string | undefined {
   return m ? m[1] : undefined;
 }
 
-function originOf(req: Request): string {
-  // Mirror oauth-discovery.originOf — see the long comment there for why.
-  // Critical detail: Cloudflare Tunnel does NOT set x-forwarded-proto,
-  // it uses cf-visitor instead. Without checking it the audience-bound
-  // resource URI we validate against ends up as http://… while the
-  // token was issued for https://… → audience mismatch on every call.
-  const host =
-    req.headers.get("x-forwarded-host") ||
-    req.headers.get("host") ||
-    new URL(req.url).host;
-  let proto: string | undefined;
-  const cfVisitor = req.headers.get("cf-visitor");
-  if (cfVisitor) {
-    try {
-      const v = JSON.parse(cfVisitor) as { scheme?: string };
-      if (v.scheme === "http" || v.scheme === "https") proto = v.scheme;
-    } catch {
-      // ignore malformed
-    }
-  }
-  if (!proto) proto = req.headers.get("x-forwarded-proto") ?? undefined;
-  if (!proto) {
-    const u = new URL(req.url);
-    proto = u.protocol.replace(":", "");
-  }
-  const isLocal =
-    host.startsWith("localhost") ||
-    host.startsWith("127.0.0.1") ||
-    host.startsWith("[::1]");
-  if (!isLocal && proto === "http") proto = "https";
-  return `${proto}://${host}`;
-}
-
 export function authMiddleware(
   auth: AuthStore,
   tokens: TokenStore,
   oauth?: OAuthStore,
   keys?: APIKeyStore,
+  // Public URL prefix ("/vault" or ""); must match oauthDiscoveryRoutes so
+  // the audience we validate equals the resource we advertise.
+  basePath = "",
 ) {
   return new Elysia().onRequest(({ request, set }) => {
     const url = new URL(request.url);
@@ -114,7 +85,7 @@ export function authMiddleware(
     // V63: OAuth access token — audience-bound to this MCP resource.
     // Only valid for /mcp paths; /api/* stays session-or-API-key.
     if (oauth && tok && (path === "/mcp" || path.startsWith("/mcp/"))) {
-      const resource = `${originOf(request)}/mcp`;
+      const resource = `${publicBase(request, basePath)}/mcp`;
       const v = oauth.validateAccess(tok, resource);
       if (v.ok) {
         const scopes = v.scope.split(/\s+/).filter(Boolean);
@@ -123,7 +94,7 @@ export function authMiddleware(
     }
 
     set.status = 401;
-    const resourceMetadata = `${originOf(request)}/.well-known/oauth-protected-resource`;
+    const resourceMetadata = `${publicBase(request, basePath)}/.well-known/oauth-protected-resource`;
     return new Response(
       JSON.stringify({ error: "unauthorized", code: "AUTH_REQUIRED" }),
       {

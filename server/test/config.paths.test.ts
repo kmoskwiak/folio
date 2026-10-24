@@ -6,6 +6,8 @@ import {
   getDefaultVaultDir,
   getDefaultSettingsDir,
 } from "../src/config/paths";
+import { loadConfig } from "../src/config";
+import { CliError } from "../src/cli";
 
 const originalEnv = { ...process.env };
 let fakeHome: string;
@@ -73,5 +75,35 @@ describe("legacy brain.md directories", () => {
     mkdirSync(join(fakeHome, "data/brain.md"), { recursive: true });
     mkdirSync(join(fakeHome, "data/folio"), { recursive: true });
     expect(getDefaultVaultDir()).toBe(join(fakeHome, "data/folio/vault"));
+  });
+});
+
+describe("base path (FOLIO_BASE_PATH / --base-path)", () => {
+  beforeEach(() => {
+    delete process.env.FOLIO_BASE_PATH;
+  });
+
+  test("defaults to no prefix", () => {
+    expect(loadConfig().basePath).toBe("");
+  });
+
+  test("env var sets the prefix", () => {
+    process.env.FOLIO_BASE_PATH = "/docs";
+    expect(loadConfig().basePath).toBe("/docs");
+  });
+
+  test("CLI flag beats env var", () => {
+    process.env.FOLIO_BASE_PATH = "/env";
+    expect(loadConfig({ basePath: "/cli" }).basePath).toBe("/cli");
+  });
+
+  test("env / means no prefix", () => {
+    process.env.FOLIO_BASE_PATH = "/";
+    expect(loadConfig().basePath).toBe("");
+  });
+
+  test("invalid env value throws CliError", () => {
+    process.env.FOLIO_BASE_PATH = "docs/";
+    expect(() => loadConfig()).toThrow(CliError);
   });
 });

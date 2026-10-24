@@ -7,8 +7,7 @@ import type {
   SearchHit,
   TreeData,
 } from "./types";
-
-const BASE = "";
+import { apiUrl } from "../lib/url";
 
 function encodePath(rel: string): string {
   return rel
@@ -27,17 +26,17 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export const api = {
   async serverInfo(): Promise<{ viewOnly: boolean; version: string }> {
-    return jsonOrThrow(await fetch(`${BASE}/api/server-info`));
+    return jsonOrThrow(await fetch(apiUrl(`/api/server-info`)));
   },
   async tree(): Promise<TreeData> {
-    return jsonOrThrow(await fetch(`${BASE}/api/tree`));
+    return jsonOrThrow(await fetch(apiUrl(`/api/tree`)));
   },
   async readNote(path: string): Promise<NoteData> {
-    return jsonOrThrow(await fetch(`${BASE}/api/note/${encodePath(path)}`));
+    return jsonOrThrow(await fetch(apiUrl(`/api/note/${encodePath(path)}`)));
   },
   async writeNote(path: string, content: string): Promise<{ path: string; mtime: number }> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/note/${encodePath(path)}`, {
+      await fetch(apiUrl(`/api/note/${encodePath(path)}`), {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ content }),
@@ -46,22 +45,22 @@ export const api = {
   },
   async deleteNote(path: string): Promise<{ ok: true; trashed: string }> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/note/${encodePath(path)}`, { method: "DELETE" }),
+      await fetch(apiUrl(`/api/note/${encodePath(path)}`), { method: "DELETE" }),
     );
   },
   async mkdir(path: string): Promise<{ ok: true }> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/folder/${encodePath(path)}`, { method: "POST" }),
+      await fetch(apiUrl(`/api/folder/${encodePath(path)}`), { method: "POST" }),
     );
   },
   async deleteFolder(path: string): Promise<{ ok: true; trashed: string }> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/folder/${encodePath(path)}`, { method: "DELETE" }),
+      await fetch(apiUrl(`/api/folder/${encodePath(path)}`), { method: "DELETE" }),
     );
   },
   async rename(from: string, to: string): Promise<RenameResult> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/rename`, {
+      await fetch(apiUrl(`/api/rename`), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ from, to }),
@@ -70,31 +69,31 @@ export const api = {
   },
   async search(q: string): Promise<SearchHit[]> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/search?q=${encodeURIComponent(q)}`),
+      await fetch(apiUrl(`/api/search?q=${encodeURIComponent(q)}`)),
     );
   },
   async backlinks(path: string): Promise<Backlink[]> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/backlinks/${encodePath(path)}`),
+      await fetch(apiUrl(`/api/backlinks/${encodePath(path)}`)),
     );
   },
   async resolve(name: string): Promise<ResolveResult> {
     return jsonOrThrow(
-      await fetch(`${BASE}/api/resolve?name=${encodeURIComponent(name)}`),
+      await fetch(apiUrl(`/api/resolve?name=${encodeURIComponent(name)}`)),
     );
   },
   async uploadMedia(notePath: string, file: File): Promise<MediaUploadResult> {
     const fd = new FormData();
     fd.append("file", file, file.name);
     return jsonOrThrow(
-      await fetch(`${BASE}/api/media/${encodePath(notePath)}`, {
+      await fetch(apiUrl(`/api/media/${encodePath(notePath)}`), {
         method: "POST",
         body: fd,
       }),
     );
   },
   mediaUrl(path: string): string {
-    return `${BASE}/api/media-raw/${encodePath(path)}`;
+    return apiUrl(`/api/media-raw/${encodePath(path)}`);
   },
   // V54: returns 503 + {code:"RAG_DISABLED"} when RAG is off — caller should
   // swallow and render an empty state instead of treating it as fatal.
@@ -106,7 +105,7 @@ export const api = {
     | { ok: false; code: "RAG_DISABLED" | "RAG_ERROR"; error: string }
   > {
     const res = await fetch(
-      `${BASE}/api/related/${encodePath(path)}?k=${k}`,
+      apiUrl(`/api/related/${encodePath(path)}?k=${k}`),
     );
     if (res.ok) return { ok: true, hits: (await res.json()) as RelatedHit[] };
     const body = await res.json().catch(() => ({}));

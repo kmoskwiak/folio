@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { parseArgs, CliError } from "../src/cli";
+import { parseArgs, CliError, normalizeBasePath } from "../src/cli";
 
 describe("CLI parser — V45", () => {
   test("no args → run with empty options", () => {
@@ -88,5 +88,52 @@ describe("CLI parser — V45", () => {
 
   test("positional argument → CliError", () => {
     expect(() => parseArgs(["foo"])).toThrow(CliError);
+  });
+});
+
+describe("CLI --base-path", () => {
+  test("--base-path <prefix>", () => {
+    expect(parseArgs(["--base-path", "/docs"])).toEqual({
+      kind: "run",
+      options: { basePath: "/docs" },
+    });
+  });
+
+  test("--base-path=<prefix> with nested segments", () => {
+    expect(parseArgs(["--base-path=/team/docs-internal"])).toEqual({
+      kind: "run",
+      options: { basePath: "/team/docs-internal" },
+    });
+  });
+
+  test("/ means no prefix", () => {
+    expect(parseArgs(["--base-path", "/"])).toEqual({
+      kind: "run",
+      options: { basePath: "" },
+    });
+  });
+
+  test("missing value → CliError", () => {
+    expect(() => parseArgs(["--base-path"])).toThrow(CliError);
+  });
+
+  test("invalid values → CliError", () => {
+    for (const bad of [
+      "docs",
+      "/docs/",
+      "//docs",
+      "/a b",
+      '/"><script>',
+      "/..",
+      "/docs/./x",
+      "/docs?x=1",
+    ]) {
+      expect(() => parseArgs([`--base-path=${bad}`])).toThrow(CliError);
+    }
+  });
+
+  test("normalizeBasePath accepts the unreserved charset", () => {
+    expect(normalizeBasePath("/a.b_c~d-e/F9")).toBe("/a.b_c~d-e/F9");
+    expect(normalizeBasePath("")).toBe("");
   });
 });
