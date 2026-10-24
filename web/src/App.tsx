@@ -64,6 +64,7 @@ import {
 } from "./hooks/useSidebarSections";
 import { useTheme } from "./hooks/useTheme";
 import { extractTagsFromMd, insertFrontmatterTag } from "./lib/tags";
+import { apiUrl } from "./lib/url";
 import { validateBasename } from "./lib/validate";
 import { isMediaName } from "./renderer/render";
 // Stylesheet order is the cascade order — keep it as is, don't sort.
@@ -313,7 +314,7 @@ export function App() {
       setToast(`Load failed: ${e instanceof Error ? e.message : String(e)}`);
     }
     try {
-      const r = await fetch("/api/tags");
+      const r = await fetch(apiUrl("/api/tags"));
       if (r.ok) {
         const items = (await r.json()) as Array<{ tag: string; count: number }>;
         items.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
@@ -326,7 +327,7 @@ export function App() {
 
   const refreshAliases = useCallback(async () => {
     try {
-      const r = await fetch("/api/aliases");
+      const r = await fetch(apiUrl("/api/aliases"));
       if (r.ok) {
         setAliasMap((await r.json()) as Record<string, string[]>);
       }
@@ -786,7 +787,7 @@ export function App() {
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch(`/api/tags/notes?tag=${encodeURIComponent(tagFilter)}`);
+        const r = await fetch(apiUrl(`/api/tags/notes?tag=${encodeURIComponent(tagFilter)}`));
         if (!r.ok) throw new Error(`${r.status}`);
         const notes = (await r.json()) as string[];
         if (!cancelled) setTagFilteredNotes(notes);
@@ -860,7 +861,7 @@ export function App() {
             setPath(null);
           }}
         >
-          <img src="/folio.svg" alt="" width={22} height={22} />
+          <img src="folio.svg" alt="" width={22} height={22} />
           <span className="brand-name">folio</span>
         </a>
         <span className="title">{path ? path.replace(/\.md$/, "") : ""}</span>

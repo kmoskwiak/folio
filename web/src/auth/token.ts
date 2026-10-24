@@ -2,6 +2,8 @@
 // localStorage (device-local), gets attached to every /api/* + /mcp/*
 // request via the wrapped fetch installed at module load.
 
+import { isApiUrl } from "../lib/url";
+
 const KEY = "brain.auth.token";
 
 export function getToken(): string | null {
@@ -39,7 +41,7 @@ export function installAuthFetch(): void {
         : input instanceof URL
           ? input.toString()
           : input.url;
-    const isApi = url.startsWith("/api/") || url.startsWith("/mcp");
+    const isApi = isApiUrl(url);
     const tok = getToken();
     if (!isApi || !tok) return original(input, init);
     const next: RequestInit = { ...(init ?? {}) };

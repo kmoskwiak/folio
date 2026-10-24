@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { getDefaultVaultDir } from "./paths";
-import type { CliOptions } from "../cli";
+import { normalizeBasePath, type CliOptions } from "../cli";
 
 function boolEnv(name: string, def: boolean): boolean {
   const raw = process.env[name];
@@ -21,9 +21,17 @@ function resolvePort(cli?: CliOptions): number {
   return Number(process.env.PORT ?? 3000);
 }
 
+function resolveBasePath(cli?: CliOptions): string {
+  // CLI > env > none. The CLI value is already normalised by parseArgs.
+  if (cli?.basePath !== undefined) return normalizeBasePath(cli.basePath);
+  return normalizeBasePath(process.env.FOLIO_BASE_PATH ?? "");
+}
+
 export interface AppConfig {
   vaultDir: string;
   port: number;
+  // Public URL prefix ("/vault") or "" when served at the root.
+  basePath: string;
   brainDir: string;
   mediaDir: string;
   trashDir: string;
@@ -36,6 +44,7 @@ export function loadConfig(cli?: CliOptions): AppConfig {
   return {
     vaultDir: resolveVaultDir(cli),
     port: resolvePort(cli),
+    basePath: resolveBasePath(cli),
     brainDir: ".brain",
     mediaDir: ".media",
     trashDir: ".brain/trash",
@@ -46,7 +55,9 @@ export function loadConfig(cli?: CliOptions): AppConfig {
 }
 
 // Back-compat: module-level config used by app.ts when called without a CLI
-// pre-parse. Reads env + XDG default but no CLI flags.
-export const config: AppConfig = loadConfig();
+// pre-parse. Reads env + XDG default but no CLI flags. basePath is pinned
+// to "" here so an invalid FOLIO_BASE_PATH fails in index.ts with a usage
+// error instead of throwing at import time.
+export const config: AppConfig = loadConfig({ basePath: "" });
 
 export type Config = AppConfig;

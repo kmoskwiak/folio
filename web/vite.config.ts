@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Relative asset URLs so the build works under any reverse-proxy prefix
+  // (the server injects <base href> when --base-path is set).
+  base: "./",
   server: {
     port: 5173,
     proxy: {

@@ -58,9 +58,10 @@ function consentPage(params: {
   state: string;
   codeChallenge: string;
   resource: string;
+  basePath: string;
   error?: string;
 }): string {
-  const { clientId, clientName, redirectUri, scope, state, codeChallenge, resource, error } = params;
+  const { clientId, clientName, redirectUri, scope, state, codeChallenge, resource, basePath, error } = params;
   const displayName = clientName || clientId;
   const safe = (s: string) => escapeHtml(s);
   const scopes = scope.split(/\s+/).filter(Boolean);
@@ -108,7 +109,7 @@ function consentPage(params: {
         <dd><div class="scopes">${scopes.map((s) => `<span class="scope">${safe(s)}</span>`).join("")}</div></dd>
       </dl>
     </div>
-    <form method="POST" action="/oauth/authorize">
+    <form method="POST" action="${basePath}/oauth/authorize">
       <input type="hidden" name="client_id" value="${safe(clientId)}" />
       <input type="hidden" name="redirect_uri" value="${safe(redirectUri)}" />
       <input type="hidden" name="scope" value="${safe(scope)}" />
@@ -143,6 +144,8 @@ export function oauthFlowRoutes(
   oauth: OAuthStore,
   clients: OAuthClientStore,
   cimd: CimdResolver,
+  // Public URL prefix ("/vault" or "") for the consent form action.
+  basePath = "",
 ) {
   // V67: resolve client_id to a (displayName, redirect_uris) pair. Two paths:
   //   - HTTPS URL → fetch CIMD document, validate, cache
@@ -299,6 +302,7 @@ export function oauthFlowRoutes(
             state,
             codeChallenge,
             resource,
+            basePath,
           });
         },
       )
@@ -350,7 +354,7 @@ export function oauthFlowRoutes(
           if (!ok) {
             set.headers["content-type"] = "text/html; charset=utf-8";
             return consentPage({
-              clientId, clientName: resolved.name, redirectUri, scope, state, codeChallenge, resource,
+              clientId, clientName: resolved.name, redirectUri, scope, state, codeChallenge, resource, basePath,
               error: "Incorrect password. Try again.",
             });
           }

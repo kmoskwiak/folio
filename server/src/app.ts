@@ -47,10 +47,12 @@ export interface AppOptions {
   gitDebounceMs?: number;
   mcpDisabled?: boolean;
   viewOnly?: boolean;
+  basePath?: string;
 }
 
 export function createApp(opts: AppOptions = {}) {
   const viewOnly = opts.viewOnly ?? false;
+  const basePath = opts.basePath ?? "";
   const vault = new Vault(opts.vaultDir ?? config.vaultDir, viewOnly);
   const index = new VaultIndex(vault);
   const repo = new GitRepo(vault.root);
@@ -82,7 +84,7 @@ export function createApp(opts: AppOptions = {}) {
 
   const app = new Elysia()
     .use(cors())
-    .use(authMiddleware(authStore, tokenStore, oauthStore, apiKeys));
+    .use(authMiddleware(authStore, tokenStore, oauthStore, apiKeys, basePath));
   // --view-only: runs after auth so unauthenticated callers still get 401.
   if (viewOnly) app.use(viewOnlyGuard());
   app
@@ -90,16 +92,16 @@ export function createApp(opts: AppOptions = {}) {
     .get("/health", () => ({ ok: true, vaultDir: vault.root }))
     // V64: OAuth discovery surface, served before everything else so it's
     // reachable even when auth.json gates the rest of the API.
-    .use(oauthDiscoveryRoutes())
+    .use(oauthDiscoveryRoutes(basePath))
     // V63 step 2+3 + V67: authorize + token + register endpoints
     // (PKCE + DCR + CIMD).
-    .use(oauthFlowRoutes(authStore, oauthStore, oauthClients, cimdResolver))
+    .use(oauthFlowRoutes(authStore, oauthStore, oauthClients, cimdResolver, basePath))
     .use(authRoutes(authStore, tokenStore))
     .use(apiKeyRoutes(apiKeys))
     .use(treeRoutes(vault))
     .use(noteRoutes(vault, index))
     .use(folderRoutes(vault))
-    .use(mediaRoutes(vault))
+    .use(mediaRoutes(vault, basePath))
     .use(searchRoutes(index))
     .use(resolveRoutes(index))
     .use(backlinkRoutes(index))

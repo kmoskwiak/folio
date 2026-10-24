@@ -1,3 +1,5 @@
+import { apiUrl } from "../lib/url";
+
 export interface FolderMeta {
   version: 1;
   icons: Record<string, string>;
@@ -11,11 +13,11 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export const metaApi = {
   async get(): Promise<FolderMeta> {
-    return jsonOrThrow<FolderMeta>(await fetch("/api/folder-meta"));
+    return jsonOrThrow<FolderMeta>(await fetch(apiUrl("/api/folder-meta")));
   },
   async set(path: string, icon: string | null, color?: string | null): Promise<{ ok: true; meta: FolderMeta }> {
     return jsonOrThrow<{ ok: true; meta: FolderMeta }>(
-      await fetch("/api/folder-meta", {
+      await fetch(apiUrl("/api/folder-meta"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ path, icon, color }),

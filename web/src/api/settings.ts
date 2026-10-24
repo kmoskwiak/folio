@@ -1,3 +1,5 @@
+import { apiUrl } from "../lib/url";
+
 export interface GitSettings {
   autocommit: boolean;
   debounceMs: number;
@@ -23,11 +25,11 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 
 export const settingsApi = {
   async get(): Promise<AppSettings> {
-    return jsonOrThrow<AppSettings>(await fetch("/api/settings"));
+    return jsonOrThrow<AppSettings>(await fetch(apiUrl("/api/settings")));
   },
   async patch(p: SettingsPatch): Promise<AppSettings> {
     return jsonOrThrow<AppSettings>(
-      await fetch("/api/settings", {
+      await fetch(apiUrl("/api/settings"), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(p),

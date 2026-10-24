@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "../lib/url";
 
 interface TaskItem {
   path: string;
@@ -17,7 +18,7 @@ export function TasksView({ onOpen, onClose }: Props) {
   const [filter, setFilter] = useState<"all" | "open" | "done">("open");
 
   useEffect(() => {
-    void fetch("/api/tasks")
+    void fetch(apiUrl("/api/tasks"))
       .then((r) => r.json() as Promise<TaskItem[]>)
       .then(setTasks)
       .catch(() => setTasks([]));

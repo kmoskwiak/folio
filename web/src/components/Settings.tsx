@@ -11,6 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Switch } from "./ui/switch";
 import { useAuth } from "../hooks/useAuth";
+import { apiUrl } from "../lib/url";
 
 interface RagConfigUI {
   enabled: boolean;
@@ -244,8 +245,8 @@ function RagPanel() {
   const refresh = useCallback(async () => {
     try {
       const [s, st] = await Promise.all([
-        fetch("/api/settings").then((r) => r.json()),
-        fetch("/api/rag/status").then((r) => r.json()),
+        fetch(apiUrl("/api/settings")).then((r) => r.json()),
+        fetch(apiUrl("/api/rag/status")).then((r) => r.json()),
       ]);
       setCfg(s.rag);
       setStatus(st);
@@ -263,7 +264,7 @@ function RagPanel() {
     setBusy(true);
     try {
       const next = { ...cfg, ...patch };
-      const r = await fetch("/api/settings", {
+      const r = await fetch(apiUrl("/api/settings"), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ rag: next }),
@@ -283,7 +284,7 @@ function RagPanel() {
     setBusy(true);
     setMsg("Testing…");
     try {
-      const r = await fetch("/api/rag/test", {
+      const r = await fetch(apiUrl("/api/rag/test"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -306,7 +307,7 @@ function RagPanel() {
     setBusy(true);
     setMsg("Reindexing…");
     try {
-      const r = await fetch("/api/rag/reindex", { method: "POST" });
+      const r = await fetch(apiUrl("/api/rag/reindex"), { method: "POST" });
       const j = await r.json();
       setMsg(
         j.ok
@@ -597,7 +598,7 @@ function APIKeysPanel() {
 
   const reload = async () => {
     try {
-      const r = await fetch("/api/auth/keys");
+      const r = await fetch(apiUrl("/api/auth/keys"));
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = (await r.json()) as { keys: PublicAPIKey[] };
       setKeys(data.keys);
@@ -617,7 +618,7 @@ function APIKeysPanel() {
       const body: { name: string; expiresInDays?: number } = { name };
       const days = Number(expiresInDays);
       if (Number.isFinite(days) && days > 0) body.expiresInDays = days;
-      const r = await fetch("/api/auth/keys", {
+      const r = await fetch(apiUrl("/api/auth/keys"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -637,7 +638,7 @@ function APIKeysPanel() {
     if (!confirm("Revoke this API key? Any client using it will start getting 401.")) return;
     setErr(null);
     try {
-      const r = await fetch(`/api/auth/keys/${id}`, { method: "DELETE" });
+      const r = await fetch(apiUrl(`/api/auth/keys/${id}`), { method: "DELETE" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       await reload();
     } catch (e) {
