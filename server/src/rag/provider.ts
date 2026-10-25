@@ -1,7 +1,7 @@
 import type { RagConfig, ProviderId } from "./types";
 
 // V49: provider abstraction. Concrete implementations in
-// embedder-local.ts (Xenova / ONNX) and embedder-openai.ts
+// embedder-local-wasm.ts (onnxruntime-web) and embedder-openai.ts
 // (OpenAI-compatible /v1/embeddings).
 export interface Embedder {
   readonly providerId: ProviderId;

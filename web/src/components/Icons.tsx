@@ -230,6 +230,18 @@ export function FilePlusIcon(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Quick switch: an arrow entering a file ("go to note"), distinct from Search.
+export function FileJumpIcon(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...baseProps} {...p}>
+      <path d="M4 12V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2h-6" />
+      <polyline points="14 3 14 9 20 9" />
+      <line x1="2" y1="17" x2="11" y2="17" />
+      <polyline points="8 14 11 17 8 20" />
+    </svg>
+  );
+}
+
 export function FolderPlusIcon(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...baseProps} {...p}>

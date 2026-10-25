@@ -650,6 +650,7 @@ folio [options]            # or: bun run start
 folio --help               # -h
 folio --version
 folio --vault-dir <path>   # -v <path>
+folio --vault-title <name> # shown instead of folio (top bar, window, installed app)
 folio --port <n>           # -p <n>
 folio --mcp-disabled       # skip mounting MCP at /mcp/*
 folio --view-only          # preview UI, no edits via API or MCP
@@ -736,6 +737,7 @@ Every env knob:
 | Var                            | Default | Notes                                     |
 |--------------------------------|---------|-------------------------------------------|
 | `VAULT_DIR`                    | XDG     | Overridden by `--vault-dir`.              |
+| `VAULT_TITLE`                  | —       | Overridden by `--vault-title`.            |
 | `PORT`                         | `3000`  | Overridden by `--port`.                   |
 | `XDG_DATA_HOME`                | —       | Base for default vault location.          |
 | `XDG_CONFIG_HOME`              | —       | Base for default settings location.       |
