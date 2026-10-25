@@ -20,6 +20,7 @@ import {
   CheckSquareIcon,
   ColumnsIcon,
   EyeIcon,
+  FileJumpIcon,
   FilePlusIcon,
   FlagIcon,
   FolderPlusIcon,
@@ -1028,7 +1029,7 @@ export function App() {
           <SearchIcon />
         </IconBtn>
         <IconBtn label="Quick switch (⌘O)" onClick={() => setCmd("switcher")}>
-          <SearchIcon />
+          <FileJumpIcon />
         </IconBtn>
         {viewOnly ? null : (
           <IconBtn
