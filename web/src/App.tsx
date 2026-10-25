@@ -153,6 +153,24 @@ export function App() {
   const mainRef = useRef<HTMLElement | null>(null);
   const syncLockRef = useRef<number>(0);
   const flushSaveRef = useRef<() => Promise<void>>(async () => {});
+  const openSeqRef = useRef(0);
+  // note being read by the latest openNote, until it lands
+  const loadingRef = useRef<{ seq: number; path: string } | null>(null);
+  // hashes openNote set itself, oldest first; each one's hashchange is
+  // skipped exactly once, so Back/Forward to the same hash still opens it
+  const writtenHashesRef = useRef<string[]>([]);
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const whenWrittenRef = useRef<(p: string) => Promise<void>>(async () => {});
+  // editor read-only while the open note is deleted or renamed
+  const [editLocked, setEditLocked] = useState(false);
+  // leaving a note (tag view, home, delete) makes any open still in flight stale
+  const cancelOpen = () => {
+    openSeqRef.current++;
+    loadingRef.current = null;
+  };
   const [activeLine, setActiveLine] = useState<number>(1);
   void resolved;
 
@@ -411,9 +429,17 @@ export function App() {
   }, [refreshGit]);
 
   useEffect(() => {
-    function onHash() {
-      const h = window.location.hash;
+    function onHash(e?: HashChangeEvent) {
+      // the event's own URL: by the time it fires, openNote may have
+      // written a newer hash already
+      const h = e ? new URL(e.newURL).hash : window.location.hash;
       if (h.startsWith("#/note/")) {
+        const written = writtenHashesRef.current;
+        const i = written.indexOf(h);
+        if (i >= 0) {
+          written.splice(0, i + 1);
+          return;
+        }
         const rest = decodeURI(h.slice("#/note/".length));
         // split a single trailing #<slug> off the path
         let p = rest;
@@ -424,7 +450,10 @@ export function App() {
           slug = rest.slice(lastHash + 1);
         }
         if (p) openNote(p, { headingSlug: slug });
-      } else if (h.startsWith("#/tag/")) {
+        return;
+      }
+      if (h.startsWith("#/tag/")) {
+        cancelOpen();
         setTagFilter(decodeURIComponent(h.slice("#/tag/".length)));
         setPath(null);
         setContent("");
@@ -437,32 +466,87 @@ export function App() {
   }, []);
 
   const openNote = useCallback(
-    async (p: string, opts?: { headingSlug?: string }) => {
+    // false only when the note could not be read; a superseded open is
+    // not a failure
+    async (p: string, opts?: { headingSlug?: string }): Promise<boolean> => {
+      // Only the latest open may touch state — older responses can land
+      // after it when the user clicks through notes quickly.
+      let seq = openSeqRef.current;
+      const isStale = () => seq !== openSeqRef.current;
+      const showHash = () => {
+        const want = `#/note/${encodeURI(p)}${opts?.headingSlug ? `#${opts.headingSlug}` : ""}`;
+        if (window.location.hash === want) return;
+        writtenHashesRef.current = [...writtenHashesRef.current, want].slice(-20);
+        window.location.hash = want;
+      };
+      const loadPanels = () => {
+        api.backlinks(p).then(
+          (bl) => {
+            if (!isStale()) setBacklinks(bl);
+          },
+          () => {},
+        );
+        // V54: kick off the related fetch in parallel. The server responds
+        // 503 immediately when RAG is disabled, so this stays cheap.
+        setRelatedState({ kind: "loading" });
+        api.related(p, 8).then(
+          (r) => {
+            if (isStale()) return;
+            if (r.ok) setRelatedState({ kind: "ready", hits: r.hits });
+            else if (r.code === "RAG_DISABLED")
+              setRelatedState({ kind: "disabled" });
+            else setRelatedState({ kind: "error", message: r.error });
+          },
+          (e) => {
+            if (isStale()) return;
+            setRelatedState({
+              kind: "error",
+              message: e instanceof Error ? e.message : String(e),
+            });
+          },
+        );
+      };
+      if (p === pathRef.current) {
+        // already open: reloading would overwrite unsaved edits. Another
+        // note still loading is dropped, and this note's panel requests
+        // went stale with it, so fetch them again
+        if (loadingRef.current) {
+          cancelOpen();
+          seq = openSeqRef.current;
+          loadPanels();
+        }
+        setMobileView("edit");
+        showHash();
+        if (opts?.headingSlug) jumpToHeadingSlug(opts.headingSlug, contentRef.current);
+        return true;
+      }
+      seq = ++openSeqRef.current;
+      loadingRef.current = { seq, path: p };
       try {
+        // a save of this note may still be on its way to disk
+        await whenWrittenRef.current(p);
+        if (isStale()) return true;
         const data = await api.readNote(p);
+        if (isStale()) return true;
         setPath(p);
         setContent(data.content);
         setTagFilter(null);
         setMobileView("edit");
-        const want = `#/note/${encodeURI(p)}${opts?.headingSlug ? `#${opts.headingSlug}` : ""}`;
-        if (window.location.hash !== want) window.location.hash = want;
-        const bl = await api.backlinks(p);
-        setBacklinks(bl);
-        // V54: kick off the related fetch in parallel. The server responds
-        // 503 immediately when RAG is disabled, so this stays cheap.
-        setRelatedState({ kind: "loading" });
-        api.related(p, 8).then((r) => {
-          if (r.ok) setRelatedState({ kind: "ready", hits: r.hits });
-          else if (r.code === "RAG_DISABLED")
-            setRelatedState({ kind: "disabled" });
-          else setRelatedState({ kind: "error", message: r.error });
-        });
+        showHash();
+        loadPanels();
         if (opts?.headingSlug) {
           // jump to heading after content settles
-          setTimeout(() => jumpToHeadingSlug(opts.headingSlug!, data.content), 60);
+          setTimeout(() => {
+            if (!isStale()) jumpToHeadingSlug(opts.headingSlug!, data.content);
+          }, 60);
         }
+        return true;
       } catch (e) {
+        if (isStale()) return true;
         setToast(`Open failed: ${e instanceof Error ? e.message : String(e)}`);
+        return false;
+      } finally {
+        if (loadingRef.current?.seq === seq) loadingRef.current = null;
       }
     },
     [],
@@ -508,13 +592,18 @@ export function App() {
     async (p: string, c: string) => {
       if (viewOnly) return;
       await api.writeNote(p, c);
-      try {
-        const bl = await api.backlinks(p);
-        setBacklinks(bl);
-      } catch {
-        // ignore
-      }
       void refreshAliases();
+      // saved a note the user already switched away from — its backlinks
+      // and tag suggestions belong to that note, not the open one
+      if (pathRef.current !== p) return;
+      // not awaited: the save queue waits for this callback, and a slow
+      // backlinks request must not hold up the next write
+      api.backlinks(p).then(
+        (bl) => {
+          if (pathRef.current === p) setBacklinks(bl);
+        },
+        () => {},
+      );
       // V54 / T137: surface up to 3 tag suggestions derived from the
       // frontmatter of the closest semantic neighbours. Whole pipeline
       // is best-effort and silent: any failure → no toast at all.
@@ -553,6 +642,8 @@ export function App() {
         .map(([t]) => t);
       if (top.length === 0) return;
       const apply = (tag: string) => {
+        // toast can outlive the note it was suggested for
+        if (pathRef.current !== p) return;
         setContent((cur) => insertFrontmatterTag(cur, tag));
       };
       showToast({
@@ -576,8 +667,15 @@ export function App() {
     [],
   );
 
-  const { status: saveStatus, flush } = useDebouncedSave(content, path, onSave, 500);
+  const { status: saveStatus, flush, forget, whenWritten } = useDebouncedSave(
+    content,
+    path,
+    onSave,
+    500,
+    (p, e) => setToast(`Save failed for ${p}: ${e instanceof Error ? e.message : String(e)}`),
+  );
   flushSaveRef.current = flush;
+  whenWrittenRef.current = whenWritten;
 
   const createNote = useCallback(
     async (parentDir: string) => {
@@ -636,38 +734,84 @@ export function App() {
       }
       const dir = p.includes("/") ? p.slice(0, p.lastIndexOf("/") + 1) : "";
       const target = isFolder ? `${dir}${trimmed}` : `${dir}${trimmed}.md`;
+      const renamingOpen = !isFolder && pathRef.current === p;
       try {
         if (isFolder) {
           setToast("Folder rename not yet supported");
           return;
         }
+        if (renamingOpen) {
+          // rename moves what's on disk: no typing meanwhile, pending edits
+          // go out first, and after that nothing may write the old path
+          setEditLocked(true);
+          await flush();
+          forget(p);
+        }
         const res = await api.rename(p, target);
         setToast(`Renamed (${res.totalReplacements} link${res.totalReplacements === 1 ? "" : "s"} patched)`);
         await refreshTree();
-        if (path === p) await openNote(target);
+        // the user may have opened another note meanwhile — keep it
+        if (renamingOpen && pathRef.current === p && !(await openNote(target))) {
+          // the old path is gone and saves to it are off; don't leave a
+          // note on screen whose edits go nowhere
+          setPath(null);
+          setContent("");
+        }
       } catch (e) {
+        if (renamingOpen) {
+          forget(null);
+          void flush().catch(() => {});
+        }
         setToast(`Rename failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        if (renamingOpen) setEditLocked(false);
       }
     },
-    [openNote, path, refreshTree],
+    [flush, forget, openNote, refreshTree],
   );
 
   const deleteItem = useCallback(
     async (p: string, isFolder: boolean) => {
       if (!confirm(`Move ${isFolder ? "folder" : "note"} "${p}" to trash?`)) return;
+      const inDeleted = (x: string) => x === p || (isFolder && x.startsWith(`${p}/`));
+      const open = pathRef.current;
+      const deletingOpen = open !== null && inDeleted(open);
       try {
+        if (deletingOpen) {
+          // trash gets the latest text: no typing meanwhile, pending edits
+          // go out first, and after that nothing may write the file again,
+          // or it would reappear in the vault
+          setEditLocked(true);
+          await flush();
+          forget(open);
+        }
         if (isFolder) await api.deleteFolder(p);
         else await api.deleteNote(p);
-        if (path === p) {
+        // an open of a deleted note still in flight must not show it
+        const loading = loadingRef.current;
+        if (loading && inDeleted(loading.path)) cancelOpen();
+        // clear the view if it shows a deleted note: the one open when the
+        // delete started, or one whose load landed meanwhile. A note the
+        // user opened in between stays.
+        const shown = pathRef.current;
+        if (shown !== null && inDeleted(shown)) {
+          forget(shown);
           setPath(null);
           setContent("");
         }
         await refreshTree();
       } catch (e) {
+        if (deletingOpen) {
+          forget(null);
+          void flush().catch(() => {});
+        }
         setToast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        if (deletingOpen) setEditLocked(false);
       }
     },
-    [path, refreshTree],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [flush, forget, refreshTree],
   );
 
   const uploadMediaForCurrent = useCallback(
@@ -749,7 +893,7 @@ export function App() {
         setCmd("search");
       } else if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void flush();
+        void flush().catch(() => {});
       } else if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setCmd("search");
@@ -826,6 +970,7 @@ export function App() {
       resolveByBasename={resolveWikilink}
       onOpenNote={openNote}
       onOpenTag={(tag) => {
+        cancelOpen();
         setTagFilter(tag);
         setPath(null);
         setContent("");
@@ -858,6 +1003,7 @@ export function App() {
           className="brand"
           onClick={(e) => {
             e.preventDefault();
+            cancelOpen();
             setPath(null);
           }}
         >
@@ -1109,7 +1255,8 @@ export function App() {
                   <Editor
                     value={content}
                     onChange={setContent}
-                    onBlur={() => void flush()}
+                    onBlur={() => void flush().catch(() => {})}
+                    disabled={editLocked}
                     basenames={basenames}
                     onUploadMedia={uploadMediaForCurrent}
                     viewRefOut={editorViewRef}
