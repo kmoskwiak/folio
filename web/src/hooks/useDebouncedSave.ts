@@ -10,7 +10,12 @@ export function useDebouncedSave(
   // a note the user already switched away from failed to save; `status`
   // only describes the open note, so the caller has to surface this
   onLeftNoteError?: (path: string, err: unknown) => void,
-): { status: Status; flush: () => Promise<void>; forget: (path: string | null) => void } {
+): {
+  status: Status;
+  flush: () => Promise<void>;
+  forget: (path: string | null) => void;
+  whenWritten: (path: string) => Promise<void>;
+} {
   const [status, setStatus] = useState<Status>("saved");
   const latest = useRef(content);
   const lastSaved = useRef<string | null>(null);
@@ -19,6 +24,9 @@ export function useDebouncedSave(
   // writes run one at a time, so an older body never lands after a newer one
   const queue = useRef<Promise<void>>(Promise.resolve());
   const queued = useRef<{ path: string; content: string } | null>(null);
+  // unsettled writes (flush waits for them) and the newest one per note
+  const pending = useRef(new Set<Promise<void>>());
+  const lastWrite = useRef(new Map<string, Promise<void>>());
   // note being deleted/renamed: its pending edits must not recreate it
   const forgotten = useRef<string | null>(null);
 
@@ -35,8 +43,12 @@ export function useDebouncedSave(
     const entry = { path: p, content: c };
     queued.current = entry;
     const job = queue.current.then(() => save(p, c));
+    pending.current.add(job);
+    lastWrite.current.set(p, job);
     const settle = () => {
       if (queued.current === entry) queued.current = null;
+      pending.current.delete(job);
+      if (lastWrite.current.get(p) === job) lastWrite.current.delete(p);
     };
     queue.current = job.then(settle, settle);
     return job;
@@ -103,9 +115,17 @@ export function useDebouncedSave(
         },
       );
     }
-    // callers (commit, checkpoint, delete) need every pending write on disk,
-    // including one still running for a note the user already left
-    await queue.current;
+    // callers (commit, checkpoint, delete, rename) need every pending write
+    // on disk, including one for a note the user already left, and must
+    // stop when one of them failed
+    await Promise.all([...pending.current]);
+  }
+
+  // settles once nothing is left to write for `p` (saved or failed), so
+  // reopening that note reads what was just written
+  function whenWritten(p: string): Promise<void> {
+    const job = lastWrite.current.get(p);
+    return job ? job.then(() => {}, () => {}) : Promise.resolve();
   }
 
   // the open note is about to be deleted or renamed: drop its pending
@@ -121,5 +141,5 @@ export function useDebouncedSave(
     forgotten.current = p;
   }
 
-  return { status, flush: flushInternal, forget };
+  return { status, flush: flushInternal, forget, whenWritten };
 }

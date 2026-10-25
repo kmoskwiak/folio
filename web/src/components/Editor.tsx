@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from "@codemirror/view";
-import { EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput } from "@codemirror/language";
@@ -14,6 +14,10 @@ import {
 } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { isMediaName } from "../renderer/render";
+
+function editableExt(disabled: boolean | undefined): Extension {
+  return [EditorView.editable.of(!disabled), EditorState.readOnly.of(!!disabled)];
+}
 
 function wikilinkFor(name: string): string {
   return isMediaName(name) ? `![[${name}]]` : `[[${name}]]`;
@@ -75,6 +79,7 @@ export function Editor({
   const onCursorLineRef = useRef(onCursorLine);
   const onScrollLineRef = useRef(onScrollLine);
   const [dropActive, setDropActive] = useState(false);
+  const editableRef = useRef(new Compartment());
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -297,6 +302,7 @@ export function Editor({
         indentWithTab,
       ]),
       EditorView.lineWrapping,
+      editableRef.current.of(editableExt(disabled)),
       updateExt,
       scrollExt,
       blurExt,
@@ -329,7 +335,7 @@ export function Editor({
     const v = viewRef.current;
     if (!v) return;
     v.contentDOM.setAttribute("aria-disabled", disabled ? "true" : "false");
-    v.contentDOM.contentEditable = disabled ? "false" : "true";
+    v.dispatch({ effects: editableRef.current.reconfigure(editableExt(disabled)) });
   }, [disabled]);
 
   return (
