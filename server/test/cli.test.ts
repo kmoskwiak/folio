@@ -91,6 +91,33 @@ describe("CLI parser — V45", () => {
   });
 });
 
+describe("CLI --vault-title", () => {
+  test("--vault-title <name>", () => {
+    expect(parseArgs(["--vault-title", "Work notes"])).toEqual({
+      kind: "run",
+      options: { vaultTitle: "Work notes" },
+    });
+  });
+
+  test("--vault-title=<name>", () => {
+    expect(parseArgs(["--vault-title=Work"])).toEqual({
+      kind: "run",
+      options: { vaultTitle: "Work" },
+    });
+  });
+
+  test("combines with --vault-dir", () => {
+    expect(parseArgs(["-v", "/tmp/w", "--vault-title", "Work"])).toEqual({
+      kind: "run",
+      options: { vaultDir: "/tmp/w", vaultTitle: "Work" },
+    });
+  });
+
+  test("missing value → CliError", () => {
+    expect(() => parseArgs(["--vault-title"])).toThrow(CliError);
+  });
+});
+
 describe("CLI --base-path", () => {
   test("--base-path <prefix>", () => {
     expect(parseArgs(["--base-path", "/docs"])).toEqual({

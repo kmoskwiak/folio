@@ -107,3 +107,33 @@ describe("base path (FOLIO_BASE_PATH / --base-path)", () => {
     expect(() => loadConfig()).toThrow(CliError);
   });
 });
+
+describe("vault title (VAULT_TITLE / --vault-title)", () => {
+  beforeEach(() => {
+    delete process.env.VAULT_TITLE;
+  });
+
+  test("defaults to null", () => {
+    expect(loadConfig().vaultTitle).toBeNull();
+  });
+
+  test("env var sets it, trimmed", () => {
+    process.env.VAULT_TITLE = "  Work  ";
+    expect(loadConfig().vaultTitle).toBe("Work");
+  });
+
+  test("blank env var means unset", () => {
+    process.env.VAULT_TITLE = "   ";
+    expect(loadConfig().vaultTitle).toBeNull();
+  });
+
+  test("CLI flag beats env var", () => {
+    process.env.VAULT_TITLE = "Env";
+    expect(loadConfig({ vaultTitle: "Cli" }).vaultTitle).toBe("Cli");
+  });
+
+  test("blank CLI value falls back to env var", () => {
+    process.env.VAULT_TITLE = "Env";
+    expect(loadConfig({ vaultTitle: " " }).vaultTitle).toBe("Env");
+  });
+});

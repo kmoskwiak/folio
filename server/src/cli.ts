@@ -4,6 +4,7 @@
 
 export interface CliOptions {
   vaultDir?: string;
+  vaultTitle?: string;
   port?: number;
   mcpDisabled?: boolean;
   viewOnly?: boolean;
@@ -32,6 +33,8 @@ Options:
                                     ($HOME/.local/share/folio/vault)
                            An existing brain.md/ directory there is
                            reused if folio/ does not exist yet.
+      --vault-title <name> Name shown in the top bar, window title and
+                           installed app instead of folio. Default: none
   -p, --port <n>           HTTP port. Default: 3000
       --mcp-disabled       Don't mount the MCP server at /mcp/*
       --view-only          Serve the vault view-only (no edits via UI, API or MCP)
@@ -43,7 +46,7 @@ Options:
 
 Environment:
   VAULT_DIR                 Same as --vault-dir (lower precedence than CLI)
-  VAULT_TITLE               Name shown in the top bar and window title
+  VAULT_TITLE               Same as --vault-title
   PORT                      Same as --port
   FOLIO_BASE_PATH           Same as --base-path
   XDG_DATA_HOME             Base for default vault location
@@ -106,6 +109,12 @@ export function parseArgs(argv: string[]): CliAction {
     if (a === "-v" || a === "--vault-dir" || a.startsWith("--vault-dir=")) {
       const { value, nextIndex } = takeValue(argv, i, "--vault-dir");
       opts.vaultDir = value;
+      i = nextIndex;
+      continue;
+    }
+    if (a === "--vault-title" || a.startsWith("--vault-title=")) {
+      const { value, nextIndex } = takeValue(argv, i, "--vault-title");
+      opts.vaultTitle = value;
       i = nextIndex;
       continue;
     }

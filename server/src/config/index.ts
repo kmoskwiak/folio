@@ -16,9 +16,12 @@ function resolveVaultDir(cli?: CliOptions): string {
   return getDefaultVaultDir();
 }
 
-function resolveVaultTitle(): string | null {
-  const raw = process.env.VAULT_TITLE?.trim();
-  return raw ? raw : null;
+function resolveVaultTitle(cli?: CliOptions): string | null {
+  // CLI > env > none (folio). Blank counts as unset, like VAULT_DIR.
+  const fromCli = cli?.vaultTitle?.trim();
+  if (fromCli) return fromCli;
+  const fromEnv = process.env.VAULT_TITLE?.trim();
+  return fromEnv ? fromEnv : null;
 }
 
 function resolvePort(cli?: CliOptions): number {
@@ -50,7 +53,7 @@ export interface AppConfig {
 export function loadConfig(cli?: CliOptions): AppConfig {
   return {
     vaultDir: resolveVaultDir(cli),
-    vaultTitle: resolveVaultTitle(),
+    vaultTitle: resolveVaultTitle(cli),
     port: resolvePort(cli),
     basePath: resolveBasePath(cli),
     brainDir: ".brain",
