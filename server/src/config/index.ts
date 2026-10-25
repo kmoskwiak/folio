@@ -16,6 +16,11 @@ function resolveVaultDir(cli?: CliOptions): string {
   return getDefaultVaultDir();
 }
 
+function resolveVaultTitle(): string | null {
+  const raw = process.env.VAULT_TITLE?.trim();
+  return raw ? raw : null;
+}
+
 function resolvePort(cli?: CliOptions): number {
   if (cli?.port !== undefined) return cli.port;
   return Number(process.env.PORT ?? 3000);
@@ -29,6 +34,8 @@ function resolveBasePath(cli?: CliOptions): string {
 
 export interface AppConfig {
   vaultDir: string;
+  // Display name shown in the top bar and window title instead of "folio".
+  vaultTitle: string | null;
   port: number;
   // Public URL prefix ("/vault") or "" when served at the root.
   basePath: string;
@@ -43,6 +50,7 @@ export interface AppConfig {
 export function loadConfig(cli?: CliOptions): AppConfig {
   return {
     vaultDir: resolveVaultDir(cli),
+    vaultTitle: resolveVaultTitle(),
     port: resolvePort(cli),
     basePath: resolveBasePath(cli),
     brainDir: ".brain",

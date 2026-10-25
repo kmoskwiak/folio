@@ -114,6 +114,27 @@
     display: none;
   }
 }
+/* VAULT_TITLE replaces the logo, so the name must stay visible on phones
+   too — truncate it instead of hiding it. */
+.topbar .brand--custom .brand-name {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ≤840px pins the brand (sticky) over the scrolling action row, so keep
+   it narrow there. */
+@media (max-width: 840px) {
+  .topbar .brand--custom .brand-name {
+    max-width: 160px;
+  }
+}
+@media (max-width: 540px) {
+  .topbar .brand--custom .brand-name {
+    max-width: 120px;
+  }
+}
 
 .topbar .title {
   font-weight: 600;

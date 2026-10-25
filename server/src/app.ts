@@ -43,6 +43,7 @@ import { createMcp, mcpRoutes } from "./mcp/server";
 
 export interface AppOptions {
   vaultDir?: string;
+  vaultTitle?: string | null;
   gitAutocommit?: boolean;
   gitDebounceMs?: number;
   mcpDisabled?: boolean;
@@ -88,7 +89,9 @@ export function createApp(opts: AppOptions = {}) {
   // --view-only: runs after auth so unauthenticated callers still get 401.
   if (viewOnly) app.use(viewOnlyGuard());
   app
-    .use(serverInfoRoutes(viewOnly))
+    // No config fallback: index.ts passes the resolved title, and tests stay
+    // deterministic even when VAULT_TITLE is set in the shell or .env.
+    .use(serverInfoRoutes(viewOnly, opts.vaultTitle ?? null))
     .get("/health", () => ({ ok: true, vaultDir: vault.root }))
     // V64: OAuth discovery surface, served before everything else so it's
     // reachable even when auth.json gates the rest of the API.

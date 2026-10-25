@@ -174,9 +174,36 @@ export function injectBaseHref(html: string, basePath: string): string {
   return html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}<base href="${basePath}/" />`);
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+// VAULT_TITLE in the initial <title>, so the window/taskbar shows it from
+// the first frame instead of flashing "folio" until /api/server-info loads.
+export function injectTitle(html: string, title: string | null): string {
+  if (!title) return html;
+  return html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(title)}</title>`);
+}
+
+// VAULT_TITLE as the PWA's install name (dock, taskbar, launcher), so
+// several installed vaults can be told apart. Left as-is if unparseable.
+export function rewriteManifest(json: string, title: string | null): string {
+  if (!title) return json;
+  try {
+    const m = JSON.parse(json) as Record<string, unknown>;
+    return JSON.stringify({ ...m, name: title, short_name: title }, null, 2);
+  } catch {
+    return json;
+  }
+}
+
+const MANIFEST = "manifest.webmanifest";
+
 export interface MountWebOptions {
   // Public URL prefix ("/vault") or "" when served at the root.
   basePath?: string;
+  // VAULT_TITLE; null/undefined keeps the built-in "folio" name.
+  vaultTitle?: string | null;
 }
 
 // Mount as a low-priority catch-all. Must be called AFTER all /api/* and
@@ -188,6 +215,7 @@ export async function mountEmbeddedWeb(
   opts: MountWebOptions = {},
 ): Promise<void> {
   const basePath = opts.basePath ?? "";
+  const vaultTitle = opts.vaultTitle ?? null;
   // Warm the resolver so the first request doesn't pay the download cost.
   const r = await getResolver();
   if (r.kind === "none") return;
@@ -202,18 +230,27 @@ export async function mountEmbeddedWeb(
       const data = await r.read(p);
       if (data) {
         set.headers["content-type"] = mimeFor(p);
+        // The manifest isn't content-hashed and depends on VAULT_TITLE, so
+        // it must revalidate like index.html rather than be cached forever.
         set.headers["cache-control"] =
-          p === "index.html"
+          p === "index.html" || p === MANIFEST
             ? "no-cache"
             : "public, max-age=31536000, immutable";
         if (p === "index.html") {
           // Re-read and injected per request on purpose: with an on-disk
           // web/dist, a frontend rebuild renames the hashed assets, and a
           // cached index would keep pointing at the deleted ones.
-          const html = injectBaseHref(new TextDecoder().decode(data), basePath);
+          const html = injectTitle(
+            injectBaseHref(new TextDecoder().decode(data), basePath),
+            vaultTitle,
+          );
           // Bytes, not a string: a string body would default the
           // content-type to text/plain.
           return new Response(new TextEncoder().encode(html));
+        }
+        if (p === MANIFEST) {
+          const json = rewriteManifest(new TextDecoder().decode(data), vaultTitle);
+          return new Response(new TextEncoder().encode(json));
         }
         return new Response(data as BodyInit);
       }

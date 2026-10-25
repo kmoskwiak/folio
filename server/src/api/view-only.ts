@@ -29,6 +29,9 @@ export function viewOnlyGuard() {
 }
 
 // Open (pre-login) so the SPA can pick its layout before auth resolves.
-export function serverInfoRoutes(viewOnly: boolean) {
-  return new Elysia().get("/api/server-info", () => ({ viewOnly, version: VERSION }));
+// vaultTitle is an operator-chosen display name, so exposing it before
+// login is fine — the top bar and window title behind the login dialog
+// show it too.
+export function serverInfoRoutes(viewOnly: boolean, vaultTitle: string | null = null) {
+  return new Elysia().get("/api/server-info", () => ({ viewOnly, version: VERSION, vaultTitle }));
 }

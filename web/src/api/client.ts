@@ -25,7 +25,7 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  async serverInfo(): Promise<{ viewOnly: boolean; version: string }> {
+  async serverInfo(): Promise<{ viewOnly: boolean; version: string; vaultTitle: string | null }> {
     return jsonOrThrow(await fetch(apiUrl(`/api/server-info`)));
   },
   async tree(): Promise<TreeData> {

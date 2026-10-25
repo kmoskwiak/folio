@@ -43,6 +43,7 @@ Options:
 
 Environment:
   VAULT_DIR                 Same as --vault-dir (lower precedence than CLI)
+  VAULT_TITLE               Name shown in the top bar and window title
   PORT                      Same as --port
   FOLIO_BASE_PATH           Same as --base-path
   XDG_DATA_HOME             Base for default vault location

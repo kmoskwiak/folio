@@ -53,6 +53,7 @@ async function main() {
     apiKeys,
   } = createApp({
     vaultDir: config.vaultDir,
+    vaultTitle: config.vaultTitle,
     gitAutocommit: config.gitAutocommit,
     gitDebounceMs: config.gitDebounceMs,
     mcpDisabled: action.options.mcpDisabled,
@@ -99,7 +100,7 @@ async function main() {
   // Mount the embedded / on-disk / downloaded web client last so it
   // acts as the SPA catch-all for everything not handled by /api or /mcp.
   const { mountEmbeddedWeb } = await import("./web/serve");
-  await mountEmbeddedWeb(app, { basePath: config.basePath });
+  await mountEmbeddedWeb(app, { basePath: config.basePath, vaultTitle: config.vaultTitle });
 
   if (config.basePath === "") {
     app.listen(config.port);

@@ -736,6 +736,7 @@ Every env knob:
 | Var                            | Default | Notes                                     |
 |--------------------------------|---------|-------------------------------------------|
 | `VAULT_DIR`                    | XDG     | Overridden by `--vault-dir`.              |
+| `VAULT_TITLE`                  | —       | Shown in the top bar and window title instead of folio. |
 | `PORT`                         | `3000`  | Overridden by `--port`.                   |
 | `XDG_DATA_HOME`                | —       | Base for default vault location.          |
 | `XDG_CONFIG_HOME`              | —       | Base for default settings location.       |
