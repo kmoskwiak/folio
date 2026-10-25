@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { LocalEmbedder } from "../src/rag/embedder-local";
+import { LocalEmbedderWasm as LocalEmbedder } from "../src/rag/embedder-local-wasm";
 
-describe("LocalEmbedder — V49", () => {
+describe("LocalEmbedderWasm — V63", () => {
   test("constructor sets providerId / modelId / dim from config", () => {
     const e = new LocalEmbedder({
       model: "Xenova/bge-small-en-v1.5",
