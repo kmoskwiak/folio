@@ -180,9 +180,17 @@ function escapeHtml(s: string): string {
 
 // VAULT_TITLE in the initial <title>, so the window/taskbar shows it from
 // the first frame instead of flashing "folio" until /api/server-info loads.
+// The meta tag hands the same value to the SPA (App.tsx seeds its brand
+// from it), so the top bar doesn't flash or shift either.
+export const VAULT_TITLE_META = "folio-vault-title";
+
 export function injectTitle(html: string, title: string | null): string {
   if (!title) return html;
-  return html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(title)}</title>`);
+  const t = escapeHtml(title);
+  return html.replace(
+    /<title>[^<]*<\/title>/i,
+    () => `<title>${t}</title><meta name="${VAULT_TITLE_META}" content="${t}" />`,
+  );
 }
 
 // VAULT_TITLE as the PWA's install name (dock, taskbar, launcher), so
@@ -230,12 +238,12 @@ export async function mountEmbeddedWeb(
       const data = await r.read(p);
       if (data) {
         set.headers["content-type"] = mimeFor(p);
-        // The manifest isn't content-hashed and depends on VAULT_TITLE, so
-        // it must revalidate like index.html rather than be cached forever.
-        set.headers["cache-control"] =
-          p === "index.html" || p === MANIFEST
-            ? "no-cache"
-            : "public, max-age=31536000, immutable";
+        // Only Vite's content-hashed output (assets/) is safe to cache
+        // forever. Everything else keeps its name across releases (and
+        // index.html / the manifest depend on VAULT_TITLE), so revalidate.
+        set.headers["cache-control"] = p.startsWith("assets/")
+          ? "public, max-age=31536000, immutable"
+          : "no-cache";
         if (p === "index.html") {
           // Re-read and injected per request on purpose: with an on-disk
           // web/dist, a frontend rebuild renames the hashed assets, and a

@@ -119,8 +119,15 @@ export function App() {
   // --view-only server: preview-only UI. The server enforces it regardless;
   // this just hides controls that would fail. null = not known yet.
   const [viewOnly, setViewOnly] = useState<boolean | null>(null);
-  // VAULT_TITLE from /api/server-info; null keeps the default folio brand.
-  const [vaultTitle, setVaultTitle] = useState<string | null>(null);
+  // VAULT_TITLE; null keeps the default folio brand. Seeded from the meta
+  // tag the server injects into index.html so the first paint is already
+  // right (absent under the Vite dev server); /api/server-info confirms it.
+  const [vaultTitle, setVaultTitle] = useState<string | null>(
+    () =>
+      document.querySelector<HTMLMetaElement>('meta[name="folio-vault-title"]')?.content ||
+      null,
+  );
+  const brandName = vaultTitle ?? "folio";
   // Edit mode only: hide the editor column and show the preview alone.
   // Desktop only (mobile has its own Edit/Preview tabs) and only with a note
   // open, so the empty state in the editor pane never disappears.
@@ -369,9 +376,8 @@ export function App() {
   // once the PWA title bar is hidden (Window Controls Overlay).
   useEffect(() => {
     const name = path ? path.replace(/\.md$/, "").split("/").pop() : null;
-    const suffix = vaultTitle ?? "folio";
-    document.title = name ? `${name} — ${suffix}` : suffix;
-  }, [path, vaultTitle]);
+    document.title = name ? `${name} — ${brandName}` : brandName;
+  }, [path, brandName]);
 
   useEffect(() => {
     api
@@ -1006,7 +1012,7 @@ export function App() {
         </button>
         <a
           href="#/"
-          aria-label={`${vaultTitle ?? "folio"} home`}
+          aria-label={`${brandName} home`}
           className={vaultTitle ? "brand brand--custom" : "brand"}
           onClick={(e) => {
             e.preventDefault();

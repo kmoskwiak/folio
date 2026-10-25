@@ -32,6 +32,6 @@ export function viewOnlyGuard() {
 // vaultTitle is an operator-chosen display name, so exposing it before
 // login is fine — the top bar and window title behind the login dialog
 // show it too.
-export function serverInfoRoutes(viewOnly: boolean, vaultTitle: string | null = null) {
+export function serverInfoRoutes(viewOnly: boolean, vaultTitle: string | null) {
   return new Elysia().get("/api/server-info", () => ({ viewOnly, version: VERSION, vaultTitle }));
 }

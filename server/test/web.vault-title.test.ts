@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Elysia } from "elysia";
@@ -9,6 +9,7 @@ import {
   mountEmbeddedWeb,
   resetWebResolverForTests,
   rewriteManifest,
+  VAULT_TITLE_META,
 } from "../src/web/serve";
 
 const INDEX = `<!doctype html>
@@ -28,14 +29,17 @@ const MANIFEST = JSON.stringify({
 });
 
 describe("injectTitle", () => {
-  test("replaces the <title> text", () => {
-    expect(injectTitle(INDEX, "Work notes")).toContain("<title>Work notes</title>");
+  test("replaces the <title> text and adds the meta tag for the SPA", () => {
+    const out = injectTitle(INDEX, "Work notes");
+    expect(out).toContain("<title>Work notes</title>");
+    expect(out).toContain(`<meta name="${VAULT_TITLE_META}" content="Work notes" />`);
   });
 
-  test("escapes HTML", () => {
-    expect(injectTitle(INDEX, `A & B <x> "q"`)).toContain(
-      "<title>A &#38; B &#60;x&#62; &#34;q&#34;</title>",
-    );
+  test("escapes HTML in both", () => {
+    const out = injectTitle(INDEX, `A & B <x> "q"`);
+    const esc = "A &#38; B &#60;x&#62; &#34;q&#34;";
+    expect(out).toContain(`<title>${esc}</title>`);
+    expect(out).toContain(`content="${esc}"`);
   });
 
   test("no title → unchanged", () => {
@@ -73,6 +77,9 @@ describe.skipIf(Object.keys(ASSETS).length > 0)("mountEmbeddedWeb with a vault t
     webDir = await mkdtemp(join(tmpdir(), "folio-web-title-"));
     await writeFile(join(webDir, "index.html"), INDEX);
     await writeFile(join(webDir, "manifest.webmanifest"), MANIFEST);
+    await writeFile(join(webDir, "folio.svg"), "<svg/>");
+    await mkdir(join(webDir, "assets"));
+    await writeFile(join(webDir, "assets", "index-abc123.js"), "1");
     prevWebDir = process.env.FOLIO_WEB_DIR;
     process.env.FOLIO_WEB_DIR = webDir;
   });
@@ -105,11 +112,23 @@ describe.skipIf(Object.keys(ASSETS).length > 0)("mountEmbeddedWeb with a vault t
     expect(m.short_name).toBe("Work");
   });
 
-  test("no title → folio everywhere, manifest still revalidates", async () => {
+  test("no title → folio everywhere, no meta tag, manifest still revalidates", async () => {
     const get = await mount();
-    expect(await (await get("/")).text()).toContain("<title>folio</title>");
+    const html = await (await get("/")).text();
+    expect(html).toContain("<title>folio</title>");
+    expect(html).not.toContain(VAULT_TITLE_META);
     const res = await get("/manifest.webmanifest");
     expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(await res.text()).toBe(MANIFEST);
+  });
+
+  test("only hashed assets/ are cached forever", async () => {
+    const get = await mount();
+    expect((await get("/assets/index-abc123.js")).headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    for (const p of ["/", "/folio.svg", "/manifest.webmanifest"]) {
+      expect((await get(p)).headers.get("cache-control")).toBe("no-cache");
+    }
   });
 });
